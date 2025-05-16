@@ -19,8 +19,19 @@ st.title("📊 ESG IPA 분석 대시보드")
 st.caption("전공종합설계 프로젝트 | 팀원: 박유진, 박현우, 송가영")
 st.markdown("---")
 
+# ✅ 사이드바: 테마 설정
+theme = st.sidebar.selectbox("🎨 그래프 색상 테마", ["기본", "선명한 테마", "모노톤"])
+
+if theme == "기본":
+    colors = {"유지": "green", "개선 우선": "red", "과잉 노력": "orange", "저우선순위": "gray"}
+elif theme == "선명한 테마":
+    colors = {"유지": "#00cc96", "개선 우선": "#EF553B", "과잉 노력": "#FFA15A", "저우선순위": "#ABABAB"}
+elif theme == "모노톤":
+    colors = {"유지": "#444444", "개선 우선": "#888888", "과잉 노력": "#BBBBBB", "저우선순위": "#DDDDDD"}
+
 # ✅ 파일 업로드
 uploaded_file = st.file_uploader("📂 엑셀 파일을 업로드하세요 (Item, Importance, Performance)", type=["xlsx"])
+compare_file = st.sidebar.file_uploader("🔍 비교용 두 번째 파일 (선택)", type=["xlsx"])
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
@@ -40,15 +51,6 @@ if uploaded_file:
 
     df["전략"] = df.apply(classify, axis=1)
 
-    # 전략별 색상
-    colors = {
-        "유지": "green",
-        "개선 우선": "red",
-        "과잉 노력": "orange",
-        "저우선순위": "gray"
-    }
-
-    # 전략별 제언
     def suggest(strategy):
         if strategy == '유지':
             return "✅ 현재 수준을 유지하세요. 잘 관리되고 있습니다."
@@ -62,14 +64,13 @@ if uploaded_file:
     df['제언'] = df['전략'].apply(suggest)
 
     # ✅ 탭 구성
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📊 IPA 결과", "🗂️ 전략 분석", "🔎 전략 필터링/수정", "🧾 항목 코드 설명", "📁 분석 데이터 저장"
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 IPA 결과", "🗂️ 전략 분석", "🔎 전략 필터링/수정", "🧾 항목 코드 설명", "📁 분석 데이터 저장", "📊 비교 분석"
     ])
 
     # 📊 IPA 결과
     with tab1:
         col1, col2 = st.columns([2, 1])
-
         with col1:
             st.subheader("🎯 IPA 그래프")
             fig, ax = plt.subplots(figsize=(8, 6))
@@ -82,13 +83,11 @@ if uploaded_file:
             ax.set_ylabel('Importance')
             ax.set_title('IPA Result')
             st.pyplot(fig)
-
         with col2:
             st.subheader("🧮 기준값")
             st.metric("평균 중요도", f"{mean_imp:.2f}")
             st.metric("평균 수행도", f"{mean_perf:.2f}")
             st.markdown("🔴 평균 Importance (Red Line)<br>🔵 평균 Performance (Blue Line)", unsafe_allow_html=True)
-
         st.markdown("---")
         st.markdown("""
         ### ℹ️ IPA 매트릭스 해석
@@ -104,11 +103,11 @@ if uploaded_file:
         for strategy in ['개선 우선', '유지', '과잉 노력', '저우선순위']:
             filtered = df[df['전략'] == strategy]
             if not filtered.empty:
-                with st.expander(f"{strategy} ({len(filtered)}개 항목)", expanded=True if strategy == '개선 우선' else False):
+                with st.expander(f"{strategy} ({len(filtered)}개 항목)", expanded=(strategy == '개선 우선')):
                     for _, row in filtered.iterrows():
                         st.markdown(f"🔹 **{row['Item']}** → {row['제언']}")
 
-    # 🔎 전략 필터링 및 항목 수정
+    # 🔎 전략 필터링 및 수정
     with tab3:
         st.subheader("✏️ 전략 수정 및 필터링")
         filtered_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
@@ -129,14 +128,50 @@ if uploaded_file:
             "E8": "물재활용 증대",
             "S16": "인권/안양 관련 정책 강화",
             "S17": "소수자 우대 정책 확대",
-            # ... 필요 시 더 추가 가능
+            # 필요한 만큼 추가 가능
         }
         for code, desc in item_descriptions.items():
             st.markdown(f"**{code}**: {desc}")
 
-    # 📁 분석 기록 저장
+    # 📁 분석 결과 저장
     with tab5:
         st.subheader("📁 분석 결과 저장")
         save_df = filtered_df if 'filtered_df' in locals() else df
         csv = save_df.to_csv(index=False).encode('utf-8-sig')
         st.download_button("📥 분석결과 CSV 다운로드", csv, "esg_analysis_result.csv", "text/csv")
+
+    # 📊 비교 분석
+    with tab6:
+        if compare_file:
+            st.subheader("🧮 업로드된 두 파일 비교")
+            df2 = pd.read_excel(compare_file)
+            df2_mean_imp = df2["Importance"].mean()
+            df2_mean_perf = df2["Performance"].mean()
+
+            df2["전략"] = df2.apply(classify, axis=1)
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown("**🎯 첫 번째 파일 IPA 그래프**")
+                fig1, ax1 = plt.subplots(figsize=(6, 5))
+                for _, row in df.iterrows():
+                    ax1.scatter(row['Performance'], row['Importance'], color=colors[row['전략']], s=80)
+                    ax1.text(row['Performance'] + 0.02, row['Importance'], row['Item'], fontsize=7)
+                ax1.axhline(mean_imp, color='red', linestyle='--')
+                ax1.axvline(mean_perf, color='blue', linestyle='--')
+                ax1.set_title("File 1")
+                st.pyplot(fig1)
+
+            with col2:
+                st.markdown("**🎯 두 번째 파일 IPA 그래프**")
+                fig2, ax2 = plt.subplots(figsize=(6, 5))
+                for _, row in df2.iterrows():
+                    ax2.scatter(row['Performance'], row['Importance'], color=colors[row['전략']], s=80)
+                    ax2.text(row['Performance'] + 0.02, row['Importance'], row['Item'], fontsize=7)
+                ax2.axhline(df2_mean_imp, color='red', linestyle='--')
+                ax2.axvline(df2_mean_perf, color='blue', linestyle='--')
+                ax2.set_title("File 2")
+                st.pyplot(fig2)
+        else:
+            st.info("비교용 파일이 업로드되지 않았습니다. 왼쪽 사이드바에서 업로드해주세요.")
