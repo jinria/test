@@ -87,8 +87,7 @@ if uploaded_file:
             st.subheader("🧮 기준값")
             st.metric("평균 중요도", f"{mean_imp:.2f}")
             st.metric("평균 수행도", f"{mean_perf:.2f}")
-            st.markdown("🔴 평균 Importance (Red Line)  
-🔵 평균 Performance (Blue Line)")
+            st.markdown("🔴 평균 Importance (Red Line)<br>🔵 평균 Performance (Blue Line)", unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown("""
